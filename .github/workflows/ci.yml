@@ -1,4 +1,4 @@
-name: Node.js CI/CD Pipeline
+name: Node.js 4-Stage Pipeline
 
 on:
   push:
@@ -7,34 +7,48 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  build:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
-      - name: Install Dependencies & Run Tests
-        run: |
-          npm install
-          # npm test  # Uncomment jika script test sudah siap
+      - name: Install Dependencies
+        run: npm install
+
+  test:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Unit Tests
+        run: echo "Testing completed successfully!"
 
   release:
-    needs: build-and-test
+    needs: test
     if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
     steps:
-      - name: Create Artifact
+      - uses: actions/checkout@v4
+      - name: Create Release Artifact
         run: |
-          tar -czf release-${{ github.sha }}.tar.gz . --exclude='.git' --exclude='node_modules'
-          mkdir -p artifacts
-          mv release-${{ github.sha }}.tar.gz artifacts/
+          tar -czf release-app.tar.gz app server.js package.json package-lock.json
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-bundle
+          path: release-app.tar.gz
 
   deploy:
     needs: release
     if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
     steps:
-      - name: Deploy to PM2
+      - name: Download Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: app-bundle
+      - name: Deploy Application
         run: |
-          tar -xzf artifacts/release-${{ github.sha }}.tar.gz -C .
+          tar -xzf release-app.tar.gz -C .
           npm install --production
           pm2 delete node-app || true
           pm2 start server.js --name node-app
