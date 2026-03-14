@@ -22,7 +22,7 @@ jobs:
       - name: Run Unit Tests
         run: echo "Testing completed successfully!"
 
-  release:
+release:
     needs: test
     if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
@@ -30,13 +30,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Create Release Artifact
         run: |
-          tar -czf release-app.tar.gz app server.js package.json package-lock.json
+          tar -czf release-app.tar.gz . --exclude='.git' --exclude='node_modules' --exclude='artifacts'
+          mkdir -p artifacts
+          mv release-app.tar.gz artifacts/
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-bundle
-          path: release-app.tar.gz
-
+          path: artifacts/release-app.tar.gz
   deploy:
     needs: release
     if: github.ref == 'refs/heads/main'
