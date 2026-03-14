@@ -1,0 +1,41 @@
+name: Node.js CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Dependencies & Run Tests
+        run: |
+          npm install
+          # npm test  # Uncomment jika script test sudah siap
+
+  release:
+    needs: build-and-test
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    steps:
+      - name: Create Artifact
+        run: |
+          tar -czf release-${{ github.sha }}.tar.gz . --exclude='.git' --exclude='node_modules'
+          mkdir -p artifacts
+          mv release-${{ github.sha }}.tar.gz artifacts/
+
+  deploy:
+    needs: release
+    if: github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+    steps:
+      - name: Deploy to PM2
+        run: |
+          tar -xzf artifacts/release-${{ github.sha }}.tar.gz -C .
+          npm install --production
+          pm2 delete node-app || true
+          pm2 start server.js --name node-app
+          pm2 save
